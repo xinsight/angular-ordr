@@ -1,4 +1,4 @@
-/* globals angular */
+/* global angular, _ */
 var app = angular.module('ordr', []);
 
 app.config(['$routeProvider', function($routeProvider){
@@ -59,6 +59,11 @@ app.controller("TabCtrl", function($scope, $routeParams, OrderService) {
     });
     return total;
   };
+  
+  $scope.removeFood = function(tab_item_id) {
+    OrderService.removeFood(tab_item_id);
+  };
+  
 });
 
 app.factory("OrderService", function(){
@@ -111,6 +116,7 @@ app.factory("OrderService", function(){
       id: 400,
       cents: 1500,
       food: 1
+      // ???: why no tab_id ?
     }, {
       id: 401,
       cents: 300,
@@ -187,6 +193,28 @@ app.factory("OrderService", function(){
       id: tabItemId
     });
     Service.tab(table_id).tabItems.push(tabItemId);
+  };
+  
+  Service.removeFood = function(tab_item_id) {
+    var toRemove = _.find(tabItems, function(e) {
+      return e.id === tab_item_id;
+    });
+    var index = tabItems.indexOf(toRemove);
+    if (index >= 0) {
+      tabItems.splice(index,1);
+    }
+    
+    // UGLY: AND remove it from the tabs list
+    var ids = _.find(tabs, function(e) { 
+      return (e.tabItems.indexOf(tab_item_id) >= 0);
+    });
+    
+    if (ids) {    
+      index = ids.tabItems.indexOf(tab_item_id);
+      if (index >= 0) {
+        ids.tabItems.splice(index,1);
+      }
+    }
   };
     
   Service.tabItemsForTable = function(table_id) {
