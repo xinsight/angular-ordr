@@ -1,3 +1,4 @@
+/* globals angular */
 var app = angular.module('ordr', []);
 
 app.config(['$routeProvider', function($routeProvider){
@@ -18,66 +19,51 @@ app.filter('money', function(){
     return '$' + (value % 100 === 0 ?
                  (value / 100 + ".00") : 
                  (parseInt(value/100, 10) + '.' + value % 100));
-  }
+  };
 });
 
 app.controller("TablesCtrl", function ($scope, OrderService) {
-  $scope.tables = OrderService.Table;
+  $scope.tables = OrderService.tables;
   $scope.tablePage = "partials/table.html";
 });
 
 app.controller("TableCtrl",  function ($scope, $routeParams, OrderService) {
-  $scope.id = $routeParams.tableId;
+  var table_id = $scope.id = $routeParams.tableId;
+  
+  $scope.table = OrderService.table(table_id);
+  
+  $scope.tab = OrderService.tab(table_id);
 
-  // load table
-  $scope.table = _.find(OrderService.Table, function(e) { return String(e.id) === $scope.id; });
-
-  // load tab
-  $scope.tab = _.find(OrderService.Tab, function(e) { return e.id === $scope.table.tab });
-
-  // load tab items
-  // this is a very stupid way to map record ids to records. but works for now
-  $scope.tab.tabItems = _.map($scope.tab.tabItems, function(tabItemId){
-    var tabItem = _.find(OrderService.TabItem, function(e){
-      return tabItemId === e.id || tabItemId === e;
-    });
-    if (tabItem) {
-      tabItem.food = _.find(OrderService.Food, function(e){
-        return tabItem.food === e.id || tabItem.food === e; 
-      });
-    }
-    return tabItem;
-  })
-
-  // add tab item
-  $scope.addFood = function(food) {
-    $scope.tab.tabItems.push(
-    {
-      food: food,
-      cents: food.cents
-    });
-  }
-})
+  $scope.addFood = function(table_id,food) {
+    OrderService.addFood(table_id,food);
+  };
+  
+});
 
 app.controller("FoodCtrl", function($scope, OrderService) {
-  $scope.foods = OrderService.Food;
-})
+  $scope.foods = OrderService.foods;
+});
 
-app.controller("TabCtrl", function($scope) {
-  $scope.totalCents = function(tabItems) {
+app.controller("TabCtrl", function($scope, $routeParams, OrderService) {
+  
+  var table_id = $scope.id = $routeParams.tableId;
+  
+  $scope.tabItems = function() {
+    return OrderService.tabItemsForTable(table_id);
+  };
+  
+  $scope.totalCents = function(items) {    
     var total = 0;
-    if (tabItems) {
-      for (var i = 0; i < tabItems.length; i++) {
-        total += tabItems[i].cents;
-      }
-    }
+    angular.forEach(items, function(tabItem) { 
+      total += tabItem.cents; 
+    });
     return total;
-  }
-})
+  };
+});
 
 app.factory("OrderService", function(){
-  var Fixtures = {};
-  Fixtures.Table = [
+  // private
+  var tables = [
     {
       id: 1,
       tab: 1
@@ -98,7 +84,7 @@ app.factory("OrderService", function(){
       tab: 6
   }];
 
-  Fixtures.Tab = [
+  var tabs = [
     {
       id: 1,
       tabItems: []
@@ -120,7 +106,7 @@ app.factory("OrderService", function(){
     }
   ];
 
-  Fixtures.TabItem = [
+  var tabItems = [
     {
       id: 400,
       cents: 1500,
@@ -144,7 +130,7 @@ app.factory("OrderService", function(){
     }
   ];
 
-  Fixtures.Food = [
+  var foods = [
     {
       id: 1,
       name: 'Pizza',
@@ -172,6 +158,54 @@ app.factory("OrderService", function(){
       cents: 2000
     }
   ];
+  
+  // public
+  var Service = {};
+  Service.foods = foods;
+  Service.tables = tables;
+  
+  Service.table = function(table_id) {
+    return _.find(tables, function(e) { return e.id == table_id; }); // note: "2" == 2
+  };
+  
+  Service.tab = function(table_id) {
+    return _.find(tabs, function(e) { return e.id == table_id; });
+  };
+  
+  Service.foodItem = function(food_id) {
+    return _.find(foods, function(e){
+      return food_id === e.id;
+    });
+  };
 
-  return Fixtures;
+  Service.addFood = function(table_id,food) {
+    // create a TabItem *AND* push the id onto the table's tabItems
+    var tabItemId = 500 + tabItems.length; // hack: unique id
+    tabItems.push({
+      food: food.id,
+      cents: food.cents,
+      id: tabItemId
+    });
+    Service.tab(table_id).tabItems.push(tabItemId);
+  };
+    
+  Service.tabItemsForTable = function(table_id) {
+    
+    var tab = Service.tab(table_id);
+    
+    var items = [];
+    angular.forEach(tab.tabItems, function(tabItemId) {
+      var tabItem = _.find(tabItems, function(e){
+        return tabItemId === e.id;
+      });
+      
+      // add food object
+      tabItem.foodItem = Service.foodItem(tabItem.food);
+      
+      items.push(tabItem);
+    });
+    return items;
+  };
+
+  return Service;
 });
