@@ -1,6 +1,6 @@
 /* global angular */
 
-var app = angular.module('ordr', ['ngResource']);
+var app = angular.module('ordr', []);
 
 app.config(['$routeProvider', function($routeProvider){
   $routeProvider.when('/tables', {
