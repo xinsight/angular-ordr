@@ -1,12 +1,13 @@
-/* global angular, _ */
-var app = angular.module('ordr', []);
+/* global angular */
+
+var app = angular.module('ordr', ['ngResource']);
 
 app.config(['$routeProvider', function($routeProvider){
   $routeProvider.when('/tables', {
     templateUrl: 'partials/tables.html', 
     controller: 'TablesCtrl'
   }).
-  when('/tables/:tableId', {
+  when('/tables/:table_id', {
     templateUrl: 'partials/table.html', 
     controller: 'TableCtrl'
   }).
@@ -23,217 +24,132 @@ app.filter('money', function(){
 });
 
 app.controller("TablesCtrl", function ($scope, OrderService) {
-  $scope.tables = OrderService.tables;
-  $scope.tablePage = "partials/table.html";
+
+  $scope.tables = OrderService.tables(function(error) {
+    $scope.error = error;
+  });
+  
 });
 
-app.controller("TableCtrl",  function ($scope, $routeParams, OrderService) {
-  var table_id = $scope.id = $routeParams.tableId;
-  
-  $scope.table = OrderService.table(table_id);
-  
-  $scope.tab = OrderService.tab(table_id);
+// note: have to use $rootScope, since both TableCtrl and TabCtrl assign to .table
+// to update list after add/remove
 
-  $scope.addFood = function(table_id,food) {
-    OrderService.addFood(table_id,food);
+app.controller("TableCtrl",  function ($scope, $rootScope, $routeParams, OrderService) {
+
+  var table_id = $scope.table_id = $routeParams.table_id;
+  
+  function getTableDetails(id) {
+    $rootScope.table = OrderService.table(id);
+  }
+
+  getTableDetails(table_id);
+
+  // note: nice for REST to return the full object that was added, so we can just push it onto the
+  // array and not have to refresh the whole thing
+  $scope.addFood = function(table_id,food_id) {
+    OrderService.addFood(table_id,food_id, function(newItem) {
+      // YUCK: update the whole array.
+      // getTableDetails(table_id);
+      // BETTER: just add the new object
+      $rootScope.table.then(function(table) {
+        table.tab.tabItems.push(newItem);
+      });
+    });
   };
   
 });
 
-app.controller("FoodCtrl", function($scope, OrderService) {
-  $scope.foods = OrderService.foods;
+app.controller("FoodCtrl", function ($scope, OrderService) {
+  
+  OrderService.foods(function(data) {
+    $scope.foods = data;
+  });
+  
 });
 
-app.controller("TabCtrl", function($scope, $routeParams, OrderService) {
+app.controller("TabCtrl", function($scope, $rootScope, $routeParams, OrderService) {
   
-  var table_id = $scope.id = $routeParams.tableId;
+  var table_id = $routeParams.table_id;
   
-  $scope.tabItems = function() {
-    return OrderService.tabItemsForTable(table_id);
-  };
-  
-  $scope.totalCents = function(items) {    
+  $scope.totalCents = function(items) {
     var total = 0;
     angular.forEach(items, function(tabItem) { 
       total += tabItem.cents; 
     });
     return total;
   };
-  
+    
   $scope.removeFood = function(tab_item_id) {
-    OrderService.removeFood(tab_item_id);
+    OrderService.removeFood(table_id, tab_item_id, function() {      
+      // !!!: full reload
+      // $rootScope.table = OrderService.table(table_id);
+      // note: more efficient to just splice out the deleted item
+      $rootScope.table.then(function(table) {
+        var index = -1;
+        for (var i=0; i<table.tab.tabItems.length; i++) {
+          if (table.tab.tabItems[i].id == tab_item_id) {
+            index = i; break;
+          }
+        }
+        if (index > -1) {
+          table.tab.tabItems.splice(index,1);
+        }
+      }); 
+      
+    });
   };
   
 });
 
-app.factory("OrderService", function(){
-  // private
-  var tables = [
-    {
-      id: 1,
-      tab: 1
-    }, {
-      id: 2,
-      tab: 2
-    }, {
-      id: 3,
-      tab: 3
-    }, {
-      id: 4,
-      tab: 4
-    }, {
-      id: 5,
-      tab: 5
-    }, {
-      id: 6,
-      tab: 6
-  }];
 
-  var tabs = [
-    {
-      id: 1,
-      tabItems: []
-    }, {
-      id: 2,
-      tabItems: []
-    }, {
-      id: 3,
-      tabItems: []
-    }, {
-      id: 4,
-      tabItems: [400, 401, 402, 403, 404]
-    }, {
-      id: 5,
-      tabItems: []
-    }, {
-      id: 6,
-      tabItems: []
-    }
-  ];
-
-  var tabItems = [
-    {
-      id: 400,
-      cents: 1500,
-      food: 1
-      // ???: why no tab_id ?
-    }, {
-      id: 401,
-      cents: 300,
-      food: 2
-    }, {
-      id: 402,
-      cents: 700,
-      food: 3
-    }, {
-      id: 403,
-      cents: 950,
-      food: 4
-    }, {
-      id: 404,
-      cents: 2000,
-      food: 5
-    }
-  ];
-
-  var foods = [
-    {
-      id: 1,
-      name: 'Pizza',
-      imageUrl: 'img/pizza.png',
-      cents: 1500
-    }, {
-      id: 2,
-      name: 'Pancakes',
-      imageUrl: 'img/pancakes.png',
-      cents: 300
-    }, {
-      id: 3,
-      name: 'Fries',
-      imageUrl: 'img/fries.png',
-      cents: 700
-    }, {
-      id: 4,
-      name: 'Hot Dog',
-      imageUrl: 'img/hotdog.png',
-      cents: 950
-    }, {
-      id: 5,
-      name: 'Birthday Cake',
-      imageUrl: 'img/birthdaycake.png',
-      cents: 2000
-    }
-  ];
+// note: $resource hid useful details, so going with plain old $http
+app.factory("OrderService", function($http) {
   
-  // public
+  var url = "http://localhost:3001/";
+  
   var Service = {};
-  Service.foods = foods;
-  Service.tables = tables;
+
+  Service.foods = function(success) {
+    $http.get(url+"foods", {cache:true}).then(function(response) {
+      success(response.data);
+    });
+  };
   
+  // note: need an error callback to update the UI
+  Service.tables = function(error) {
+    return $http.get(url+"tables", {cache:true}).then(function(result) {
+      return result.data; 
+    }, function(result) { // error
+      // TODO: create a more generic error system
+      error("Unable to connect to " + result.config.url + " [" + result.status + "]");
+    });
+  };
+
+  // promise //
   Service.table = function(table_id) {
-    return _.find(tables, function(e) { return e.id == table_id; }); // note: "2" == 2
+    return $http.get(url+"tables/"+table_id).then(function(response) {
+      return response.data;
+    });
   };
   
-  Service.tab = function(table_id) {
-    return _.find(tabs, function(e) { return e.id == table_id; });
-  };
-  
-  Service.foodItem = function(food_id) {
-    return _.find(foods, function(e){
-      return food_id === e.id;
-    });
-  };
-
-  Service.addFood = function(table_id,food) {
-    // create a TabItem *AND* push the id onto the table's tabItems
-    var tabItemId = 500 + tabItems.length; // hack: unique id
-    tabItems.push({
-      food: food.id,
-      cents: food.cents,
-      id: tabItemId
-    });
-    Service.tab(table_id).tabItems.push(tabItemId);
-  };
-  
-  Service.removeFood = function(tab_item_id) {
-    var toRemove = _.find(tabItems, function(e) {
-      return e.id === tab_item_id;
-    });
-    var index = tabItems.indexOf(toRemove);
-    if (index >= 0) {
-      tabItems.splice(index,1);
-    }
+  Service.addFood = function(table_id,food_id,success) {
     
-    // UGLY: AND remove it from the tabs list
-    var ids = _.find(tabs, function(e) { 
-      return (e.tabItems.indexOf(tab_item_id) >= 0);
-    });
-    
-    if (ids) {    
-      index = ids.tabItems.indexOf(tab_item_id);
-      if (index >= 0) {
-        ids.tabItems.splice(index,1);
-      }
-    }
-  };
-    
-  Service.tabItemsForTable = function(table_id) {
-    
-    var tab = Service.tab(table_id);
-    
-    var items = [];
-    angular.forEach(tab.tabItems, function(tabItemId) {
-      var tabItem = _.find(tabItems, function(e){
-        return tabItemId === e.id;
+    $http.post(url+"tables/"+table_id+"/foods/"+food_id)
+      .then(function(res) {
+        success(res.data);
       });
-      
-      // add food object
-      tabItem.foodItem = Service.foodItem(tabItem.food);
-      
-      items.push(tabItem);
-    });
-    return items;
+    
   };
+  
+  // TODO: replace callback with promise (caller can use then() to trigger the view update
+  Service.removeFood = function(table_id, tab_item_id, callback) {
 
+    // note: $httpd.delete causes a warning
+    $http['delete'](url+"tables/"+table_id+"/tabitem/"+tab_item_id).then(function(res) {
+      callback();
+    });
+    
+  };
+  
   return Service;
 });

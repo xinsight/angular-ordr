@@ -2,7 +2,7 @@
   <div class="three columns" ng-controller="FoodCtrl">
   	<ul id="menu">
   		<li ng-repeat="food in foods">
-        <a ng-click="addFood(id,food)">
+        <a ng-click="addFood(table_id,food.id)">
 				<img ng-src="{{food.imageUrl}}" />
       </a>
 				<p>
@@ -14,15 +14,15 @@
   <div class="nine columns" ng-controller="TabCtrl">
     <h2>Table <span>{{table.id}}</span></h2>
       <ul id="customer-tab">
-        <li ng-show="tab.tabItems.length == 0"><h3>Click a food to add it</h3></li>
-        <li ng-repeat="tabItem in tabItems()">
+        <li ng-show="table.tab.tabItems.length == 0"><h3>Click a food to add it</h3></li>
+        <li ng-repeat="tabItem in table.tab.tabItems">
           <h3>
-            {{tabItem.foodItem.name}} <span>{{ tabItem.cents | money }}</span> 
-              <a ng-click="removeFood(tabItem.id)">[x]</a>
+            {{tabItem.name}} <span>{{ tabItem.cents | money }}</span> 
+              <a ng-click="removeFood(tabItem.id)" title="{{tabItem.id}}">[x]</a>
           </h3>
         </li>
-        <li id='total' ng-show="tab.tabItems.length > 0">
-          <h3>Total <span>{{ totalCents(tabItems()) | money }}</span></h3>
+        <li id='total' ng-show="table.tab.tabItems.length > 0">
+          <h3>Total <span>{{ totalCents(table.tab.tabItems) | money }}</span></h3>
         </li>
       </ul>
   </div>

@@ -5,10 +5,42 @@ A simple restaurant's order management demo app:
 
 - That lets one manage a tab of orders made at each table in the restaurant.
 - A list of tables is on the left. When a table is selected, display the list of food items and an order menu of items ordered
-- Allow adding food items to the order menu. Show the cost of each added item and the total.
+- Allow adding/removing food items to the order menu. Show the cost of each added item and the total.
 
 Live Demo: [in Angular](https://dl.dropbox.com/u/229718/angular-ordr/index.html) and [in Ember](https://dl.dropbox.com/u/229718/ember-ordr/index.html) ([diff](https://github.com/harleyttd/angular-ordr/commit/0b93f678776867b8e7a1e97c8050ea66113f3ede))
 
+## Notes on REST 
+
+The original [angular-ordr](https://github.com/harleyttd/angular-ordr/) had a
+lot of code to manage the client-side-only data structure.  I was curious how
+the angular code would look with a proper backend, so I created one using
+[Restify](http://mcavage.github.io/node-restify/) and node.js.
+
+To start the REST server:
+
+    npm install -g restify
+    node server/server.js
+
+Supported REST URLs:
+
+    # view tables
+    curl -i http://localhost:3001/tables
+    # view details for a table (tab items)
+    curl -i http://localhost:3001/tables/1
+    # view foods
+    curl -i http://localhost:3001/foods
+    # add food item 3 to table 1  (POST)
+    curl -d "" -i http://localhost:3001/tables/1/foods/3
+    # remove food item from table
+    curl -X DELETE -i http://localhost:3001/tables/1/tabitem/100
+
+Access to the REST server is contained in a service, which is used by the various controllers.
+The only part that seemed crufty was having to use the $rootScope to store the table details,
+so that they could be accessed by two controllers. (One controller adds
+elements to the tab, and another removes elements. When they used $scope, they interface would
+occasionally ignore adds and deletes.)
+
+Two important omissions in this demo: unit testing and robust handling of network errors.
 
 ## Rewrite notes
 
